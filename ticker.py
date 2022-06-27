@@ -225,28 +225,42 @@ class Ticker(AbstractAPI):
 
     def get_inst_owners(self, year: int=CUR_YEAR,
         quarter: int=LAST_Q,
-        save_to_sql: bool=False):
+        save_to_sql: bool=False,
+        max_workers: int=8):
         """get number of shares held by institutional shareholders disclosed 
         through 13F
         :param incl_cur_q: Include current Q or not
         """
         # TODO - solve concurrency issue caused by the temporary endpoint reset
-        # TODO - add lookup of available dates
         endpoint = self.endpoint
         self.endpoint = endpoint.replace("v3", "v4")
-        url = "institutional-ownership/symbol-ownership-percent"
+        url = "institutional-ownership/institutional-holders/symbol-ownership-percent"
         def get_page(page: int=0):
             month, day = QUARTER_END.get(quarter)
+            date = dt.date(year, month, day).strftime("%Y-%m-%d")
             res = self._get_data(url=url, ticker=",".join(self.tickers),
                 page=page,
-                date=dt.date(year, month, day).strftime("%Y-%m-%d"))
+                date=date)
             if res: return res
         page, i = 1, 0
         res = []
-        while page:
-            page = get_page(i)
-            if isinstance(page, list): res += page
-        return res
+        
+        if max_workers > 1:
+            with ThreadPoolExecutor() as executor:
+                while page:
+                    futures = [executor.submit(get_page, p) 
+                        for p in range(i, i + max_workers)]
+                    for future in as_completed(futures):
+                        page = future.result()
+                        if isinstance(page, list):
+                            res += page
+                    i += max_workers
+        else:
+            while page:
+                page = get_page(i)
+                if isinstance(page, list): res += page
+                i += 1
+
         if isinstance(res, list):
             ls = []
             for entry in res:
@@ -254,7 +268,7 @@ class Ticker(AbstractAPI):
                 ls.append(s.to_frame().T)
             df = pd.concat(ls).T
             df = df.T.set_index(['date', 'symbol', 'cik',]).T
-            df = df.stack(['symbol', 'cik']).swaplevel(0, 2)
+            # df = df.stack(['symbol', 'cik']).swaplevel(0, 2)
             return df
 
         if save_to_sql:
@@ -269,10 +283,11 @@ class Ticker(AbstractAPI):
 
     @classmethod
     def list_inst_owners(cls, ticker: str, year: int=CUR_YEAR, 
-        quarter: int=LAST_Q):
+        quarter: int=LAST_Q, max_workers: int=8):
         """classmethod version of get_ownership"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_inst_owners(year=year, quarter=quarter)
+            config=DEFAULT_CONFIG).get_inst_owners(year=year, 
+                quarter=quarter, max_workers=max_workers)
 
     def __get_v4_info(self, url: str):
         """template function for getting v4 info"""
