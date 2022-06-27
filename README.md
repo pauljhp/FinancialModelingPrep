@@ -1,14 +1,37 @@
 # Wrapper for the Financial Modeling Prep API
-version 0.0.1
+
+version 0.0.2
+
+## Change log
+
+- Fixed OSError - path does not exist with logging
+
+## Usage
+
+- All sub modules are designed to work both as modules and as scripts
+
+### 1. Ticker Class
+
+- You can instantiate a Ticker class:
+
+  > from FinancialModelingPrep.ticker import Ticker
+  >
+
+  > t = Ticker(`<YOUR TICKER>`) # you either input a single ticker (case insentitive), wrap multiple tickers seperated by ",", or wrap multiple tickers in a List[str]
+  >
+- If you have specified a sqlite path, when setting save_to_sql=True, apart from returning a pd.DataFrame, the dataframe will also be written into the sql database
+- You can also call classmethod Ticker().get_income_statements(ticker=`<YOUR TICKER>`) with our instantiating the class
 
 ## Structure
+
 - 3 main classes are implemented:
-    - ticker.Ticker for getting stock level information;
-    - funds.Funds for getting information about funds;
-    - indices.Index for getting information about indices. 
+  - ticker.Ticker for getting stock level information;
+  - funds.Funds for getting information about funds;
+  - indices.Index for getting information about indices.
 - All classes inherits from the base class _abstract.AbstractAPI
 
 ## Style guide
+
 - Use type hints for type checks and readability
 - CamelCase classes, all file and method names should be lower cases, connected by \_;
 - Global variables shoudl be in UPPER CASE;

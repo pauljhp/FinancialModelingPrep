@@ -17,7 +17,12 @@ import logging
 import sqlite3
 from copy import deepcopy
 
-logging.basicConfig(filename='./FinancialModelingPrep/.log/log.log', 
+LOGPATH = './FinancialModelingPrep/.log/log.log'
+
+if not os.path.exists(LOGPATH):
+    os.makedirs(LOGPATH)
+
+logging.basicConfig(filename=LOGPATH, 
     encoding='utf-8', level=logging.DEBUG)
 
 
