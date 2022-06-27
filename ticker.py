@@ -1,11 +1,24 @@
+from doctest import DocFileSuite
+from re import L
 from urllib.parse import urljoin
 from copy import deepcopy
 import pandas as pd
 from typing import Optional, Union, List, Dict, Callable
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import datetime as dt
 from ._abstract import AbstractAPI
 from .utils.config import Config
 
 DEFAULT_CONFIG = "./FinancialModelingPrep/.config/config.json"
+QUARTER_END = {1: (3, 31), 
+    2: (6, 30),
+    3: (9, 30),
+    4: (12, 31)}
+TODAY = dt.datetime.today()
+NOW = dt.datetime.now()
+CUR_YEAR = TODAY.year
+LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
 class Ticker(AbstractAPI):
 
     def __init__(self, ticker: str, 
@@ -31,6 +44,7 @@ class Ticker(AbstractAPI):
                     for t in tickers]), \
                     f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
             self.tickers = [str(t).upper() for t in ticker]
+        self.tickers_str = ",".join(self.tickers)
 
     def __get_statements(self, statement='income', 
         freq="A", 
@@ -173,9 +187,10 @@ class Ticker(AbstractAPI):
         """
         return cls(ticker, DEFAULT_CONFIG).get_transcripts(year=year, quarter=quarter)
 
-    def get_ownership(self, incl_cur_q: bool=True, 
+    def get_inst_ownership(self, incl_cur_q: bool=True, 
         save_to_sql: bool=False,):
-        """interface for getting income/balance sheet/cash flow statements
+        """get number of shares held by institutional shareholders disclosed 
+        through 13F
         :param incl_cur_q: Include current Q or not
         """
         # TODO - solve concurrency issue caused by the temporary endpoint reset
@@ -203,10 +218,61 @@ class Ticker(AbstractAPI):
             raise TypeError("value returned from API is not a list")
 
     @classmethod
-    def list_ownership(cls, ticker: str, incl_cur_q: bool=True):
+    def list_inst_ownership(cls, ticker: str, incl_cur_q: bool=True):
         """classmethod version of get_ownership"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_ownership(incl_cur_q=incl_cur_q)
+            config=DEFAULT_CONFIG).get_inst_ownership(incl_cur_q=incl_cur_q)
+
+    def get_inst_owners(self, year: int=CUR_YEAR,
+        quarter: int=LAST_Q,
+        save_to_sql: bool=False):
+        """get number of shares held by institutional shareholders disclosed 
+        through 13F
+        :param incl_cur_q: Include current Q or not
+        """
+        # TODO - solve concurrency issue caused by the temporary endpoint reset
+        # TODO - add lookup of available dates
+        endpoint = self.endpoint
+        self.endpoint = endpoint.replace("v3", "v4")
+        url = "institutional-ownership/symbol-ownership-percent"
+        def get_page(page: int=0):
+            month, day = QUARTER_END.get(quarter)
+            res = self._get_data(url=url, ticker=",".join(self.tickers),
+                page=page,
+                date=dt.date(year, month, day).strftime("%Y-%m-%d"))
+            if res: return res
+        page, i = 1, 0
+        res = []
+        while page:
+            page = get_page(i)
+            if isinstance(page, list): res += page
+        return res
+        if isinstance(res, list):
+            ls = []
+            for entry in res:
+                s = pd.Series(entry)
+                ls.append(s.to_frame().T)
+            df = pd.concat(ls).T
+            df = df.T.set_index(['date', 'symbol', 'cik',]).T
+            df = df.stack(['symbol', 'cik']).swaplevel(0, 2)
+            return df
+
+        if save_to_sql:
+            start = f"{df.columns.get_level_values('date')[0]}"
+            end = f"{df.columns.get_level_values('date')[-1]}"
+            tablename = f"{'_'.join(self.ticker)}_ownership_{start}_{end}"
+            df.to_sql(tablename, 
+                self._cur, if_exists="replace")
+            return df
+        else:
+            raise TypeError("value returned from API is not a list")
+
+    @classmethod
+    def list_inst_owners(cls, ticker: str, year: int=CUR_YEAR, 
+        quarter: int=LAST_Q):
+        """classmethod version of get_ownership"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_inst_owners(year=year, quarter=quarter)
 
     def __get_v4_info(self, url: str):
         """template function for getting v4 info"""
@@ -251,3 +317,45 @@ class Ticker(AbstractAPI):
         res = cls(ticker=ticker, 
             config=DEFAULT_CONFIG).get_profile()
         return res
+
+    def get_execs(self):
+        """get list of key executives, their positions and bios"""
+        url = urljoin("key-executives/", ",".join(self.tickers))
+        res = self._get_data(url=url)
+        if isinstance(res, list):
+            df = pd.concat(pd.Series(d).to_frame().T for d in res)
+            df.index = range(df.shape[0])
+            return df
+        else: return res
+    
+    @classmethod
+    def list_execs(cls, ticker: Union[str, List[str]]):
+        """classmethod version of get_execs"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_execs()
+
+    def get_financial_ratios(self, limit: int=10, 
+        freq: str="A") -> Union[pd.DataFrame, list]:
+        """get financial ratios in the statements
+        :param limit: number of period going back
+        :param freq: takes 'A' or 'Q'
+        """
+        url = urljoin("ratios/", self.tickers_str)
+        if freq == 'A':
+            res = self._get_data(url=url)
+        elif freq == 'Q':
+            res = self._get_data(url=url, period='quarter')
+        else:
+            raise NotImplementedError
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            return df
+        else:
+            return res
+
+    @classmethod
+    def download_financial_ratios(cls, ticker: str, 
+        limit: int=10, freq: str='A') -> Union[pd.DataFrame, list]:
+        """classmethod version of get_financial_ratios"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_financial_ratios(limit=limit, freq=freq)
