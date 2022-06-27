@@ -44,6 +44,8 @@ class Ticker(AbstractAPI):
                     for t in tickers]), \
                     f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
             self.tickers = [str(t).upper() for t in ticker]
+        else:
+            raise TypeError("ticker must be a string or a list of strings")
         self.tickers_str = ",".join(self.tickers)
 
     def __get_statements(self, statement='income', 
