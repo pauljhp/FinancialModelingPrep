@@ -22,7 +22,7 @@ TODAY = dt.datetime.today()
 NOW = dt.datetime.now()
 CUR_YEAR = TODAY.year
 LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
-
+DEFAULT_START_DATE = dt.date(2020, 1, 1)
 
 class Ticker(AbstractAPI):
 
@@ -499,3 +499,39 @@ class Ticker(AbstractAPI):
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).historical_price(start_date=start_date, 
                 end_date=end_date, freq=freq)
+
+    def stock_news(self, limit: Optional[int]=None, 
+        start_date: Union[dt.date, str]=DEFAULT_START_DATE):
+        """get list of news"""
+        max_entries = 50000
+        url = 'stock_news'
+        if isinstance(start_date, str): start_date = dt.datetime.strptime(start_date, "%Y-%m-%d")
+        if not limit:
+            res = self._get_data(url=url, tickers=self.tickers, limit=1000) # note the API weirdly takes a tickers parameter, not our usual symbol paramter. This will wrap it into kwargs
+            earliest_date = dt.datetime.strptime(res[-1].get('publishedDate'),
+                "%Y-%m-%d %H:%M:%S")
+            if earliest_date > start_date:
+                ratio = (TODAY - start_date).days \
+                    / (TODAY - earliest_date).days 
+                new_lim = min(max_entries, round(ratio * 1000))
+                res = self._get_data(url=url, tickers=self.tickers, limit=new_lim)
+        else:
+            res = self._get_data(url=url, tickers=self.tickers, limit=limit)
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            return df
+            df = pandas_strptime(df, 'publishedDate')
+            df.set_index('publishedDate')
+            return df
+
+    @classmethod
+    def get_stock_news(cls, ticker: Union[str, List[str]],
+        limit: Optional[int]=None, 
+        start_date: Union[dt.date, str]=DEFAULT_START_DATE):
+        """classmethod version of stock_news
+        :param ticker: takes single ticker or list of tickers. Strongly suggest 
+            using single ticker if querying for long range data
+        """
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).stock_news(start_date=start_date, 
+                limit=limit)
