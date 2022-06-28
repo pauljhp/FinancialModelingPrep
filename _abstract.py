@@ -39,13 +39,15 @@ class AbstractAPI(ABC):
         assert isinstance(config, Config)
         return config
 
-    def _get_available_tickers(self, mode='statements') -> Union[List, pd.DataFrame]:
+    def _get_available_tickers(self, mode='statements'
+        ) -> Union[List, pd.DataFrame]:
         """
         Get the list of all available tickers.
         """
         available_ticker_urls = {
         'statements': 'financial-statement-symbol-lists/',
         'market_data': 'available-trade/list/',
+        'indices': 'symbol/available-indexes'
         }
         url = available_ticker_urls.get(mode)
         endpoint = urljoin(self._endpoint, url)
@@ -54,10 +56,7 @@ class AbstractAPI(ABC):
         if isinstance(ls[0], str):
             return ls
         else:
-            new_ls = []
-            for i in ls:
-                s = pd.Series(i)
-                new_ls.appned(s.to_frame().T)
+            new_ls = [pd.Series(i).to_frame().T for i in ls]
             df = pd.concat(new_ls).T
             return df
 
@@ -88,13 +87,16 @@ class AbstractAPI(ABC):
         self.sql_conn = sqlite3.connect(sql_path) if sql_path else None
         self._cur = self.sql_conn.cursor() if self.sql_conn else None
     
-    def _get_data(self, url: str, ticker: Optional[str]=None, ignore_error: bool=True, 
+    def _get_data(self, url: str, ticker: Optional[str]=None, 
+        additional_params: Optional[Dict]=None,
+        ignore_error: bool=True, 
         **kwargs, ) -> Union[List, Dict]:
         """
         :param url: The url to get data from. Do not include the root endpoint
         """
         params = deepcopy(self._default_params)
         if ticker: params.update(dict(symbol=ticker))
+        if additional_params: params.update(additional_params)
         params.update(kwargs)
         url = urljoin(self._endpoint, url)
         res = self.session.get(url, params=params)

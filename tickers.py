@@ -1,5 +1,4 @@
-from doctest import DocFileSuite
-from re import L
+from __future__ import annotations
 from urllib.parse import urljoin
 from copy import deepcopy
 import pandas as pd
@@ -9,16 +8,22 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 from ._abstract import AbstractAPI
 from .utils.config import Config
+from .utils.utils import pandas_strptime
+
 
 DEFAULT_CONFIG = "./FinancialModelingPrep/.config/config.json"
-QUARTER_END = {1: (3, 31), 
+QUARTER_END = {
+    1: (3, 31), 
     2: (6, 30),
     3: (9, 30),
-    4: (12, 31)}
+    4: (12, 31)
+    }
 TODAY = dt.datetime.today()
 NOW = dt.datetime.now()
 CUR_YEAR = TODAY.year
 LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
+
+
 class Ticker(AbstractAPI):
 
     def __init__(self, ticker: str, 
@@ -40,8 +45,8 @@ class Ticker(AbstractAPI):
                 assert ticker.upper().strip() in [t.upper() for t in self.available_tickers], "Not a valid ticker!"
                 self.tickers = [ticker.upper()]
         elif isinstance(ticker, list):
-            assert len(tickers) == sum([str(t).upper().strip() in self.available_tickers 
-                    for t in tickers]), \
+            assert len(ticker) == sum([str(t).upper().strip() in self.available_tickers 
+                    for t in ticker]), \
                     f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
             self.tickers = [str(t).upper() for t in ticker]
         else:
@@ -228,7 +233,7 @@ class Ticker(AbstractAPI):
     def get_inst_owners(self, year: int=CUR_YEAR,
         quarter: int=LAST_Q,
         save_to_sql: bool=False,
-        max_workers: int=8):
+        max_workers: int=8) -> Optional[pd.DataFrame]:
         """get number of shares held by institutional shareholders disclosed 
         through 13F
         :param incl_cur_q: Include current Q or not
@@ -272,6 +277,8 @@ class Ticker(AbstractAPI):
             df = df.T.set_index(['date', 'symbol', 'cik',]).T
             # df = df.stack(['symbol', 'cik']).swaplevel(0, 2)
             return df
+        else:
+            return res
 
         if save_to_sql:
             start = f"{df.columns.get_level_values('date')[0]}"
@@ -291,7 +298,7 @@ class Ticker(AbstractAPI):
             config=DEFAULT_CONFIG).get_inst_owners(year=year, 
                 quarter=quarter, max_workers=max_workers)
 
-    def __get_v4_info(self, url: str):
+    def __get_v4_info(self, url: str) -> Dict:
         """template function for getting v4 info"""
         endpoint = self.endpoint
         self.endpoint = endpoint.replace("v3", "v4")
@@ -299,20 +306,20 @@ class Ticker(AbstractAPI):
         self.endpoint = endpoint
         return res
 
-    def get_peers(self):
+    def get_peers(self) -> List[str]:
         """get the stock's peers"""
         url = "stock_peers"
         res = self.__get_v4_info(url=url)
         return res
 
     @classmethod
-    def list_peers(cls, ticker: Union[str, List[str]]):
+    def list_peers(cls, ticker: Union[str, List[str]]) -> List[str]:
         """classmethod version of get_peers"""
         res = cls(ticker=ticker, 
             config=DEFAULT_CONFIG).get_peers()
         return res
 
-    def get_core_info(self):
+    def get_core_info(self) -> Dict:
         """get the stock's core information such as cik, exchange, industry"""
         url = "company-core-information"
         res = self.__get_v4_info(url=url)
@@ -329,13 +336,13 @@ class Ticker(AbstractAPI):
         else: return res
 
     @classmethod
-    def company_profile(cls, ticker: Union[str, List[str]]):
+    def company_profile(cls, ticker: Union[str, List[str]]) -> Dict[str, float]:
         """classmethod version of get_profile"""
         res = cls(ticker=ticker, 
             config=DEFAULT_CONFIG).get_profile()
         return res
 
-    def get_execs(self):
+    def get_execs(self) -> Union[pd.DataFrame, Dict]:
         """get list of key executives, their positions and bios"""
         url = urljoin("key-executives/", ",".join(self.tickers))
         res = self._get_data(url=url)
@@ -352,7 +359,7 @@ class Ticker(AbstractAPI):
             config=DEFAULT_CONFIG).get_execs()
 
     def get_financial_ratios(self, limit: int=10, 
-        freq: str="A") -> Union[pd.DataFrame, list]:
+        freq: str="A") -> Union[pd.DataFrame, Dict]:
         """get financial ratios in the statements
         :param limit: number of period going back
         :param freq: takes 'A' or 'Q'
@@ -376,3 +383,119 @@ class Ticker(AbstractAPI):
         """classmethod version of get_financial_ratios"""
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).get_financial_ratios(limit=limit, freq=freq)
+
+    def get_key_metrics(self, limit: int=10, 
+        freq: int='A') -> Union[pd.DataFrame, Dict]:
+        """get the key metrics such as key financial ratios and valuation
+        :param limit: going back how many period 
+        :param freq: takes 'Q' or 'A'
+        """
+        url = urljoin("key-metrics/", self.tickers_str)
+        if freq == 'A':
+            res = self._get_data(url, limimt=limit)
+        elif freq == 'Q':
+            res = self._get_data(url, period='quarter', limit=limit)
+        else:
+            raise NotImplementedError
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            df = df.set_index(["symbol", "date", "period"])
+            return df
+        else:
+            return res
+    
+    @classmethod
+    def list_key_metrics(cls, ticker:str, limit: int=10,
+        freq: int='A') -> Union[pd.DataFrame, Dict]:
+        """classmethod version of get_key_metrics"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_key_metrics(limit=limit, freq=freq)
+    
+    def get_financial_growth(self, limit: int=10, 
+        freq: int='A') -> Union[pd.DataFrame, Dict]:
+        """get the growth of key fundamental measures
+        :param limit: going back how many period 
+        :param freq: takes 'Q' or 'A'
+        """
+        url = urljoin("financial-growth/", self.tickers_str)
+        if freq == 'A':
+            res = self._get_data(url, limimt=limit)
+        elif freq == 'Q':
+            res = self._get_data(url, period='quarter', limit=limit)
+        else:
+            raise NotImplementedError
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            df = pandas_strptime(df, index_name='date', axis=1)
+            df = df.set_index(["symbol", "date", "period"])
+            return df
+        else:
+            return res
+
+    @classmethod
+    def list_financial_growth(cls, ticker:str, limit: int=10,
+        freq: int='A') -> Union[pd.DataFrame, Dict]:
+        """classmethod version of get_financial_growth"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_financial_growth(limit=limit, freq=freq)
+    
+    def current_price(self):
+        """get current quote price"""
+        url = urljoin("quote", self.tickers_str)
+        res = self._get_data(url)
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            return df
+
+    @classmethod
+    def get_current_price(cls, ticker: Union[str, List[str]]):
+        """classmethod version of current_price"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).get_current_price()
+    
+    def historical_price(self, start_date: Union[str, dt.date],
+        end_date: Union[str, dt.date], freq='d'):
+        """get the historical price of the tickers
+        :param start_date: either "%Y-%m_d" or dt.date format
+        :param end_date: either "%Y-%m_d" or dt.date format
+        :param freq: takes 'd', '1hour', '30min', '15min', '5min', '1min'
+        """
+        if isinstance(start_date, dt.date): start_date = start_date.strftime("%Y-%m-%d")
+        if isinstance(end_date, dt.date): end_date = end_date.strftime("%Y-%m-%d")
+        assert isinstance(start_date, str) and isinstance(end_date, str), "only str and dt.date accepted for start_date and end_date"
+        if freq == 'd':
+            url = urljoin(f"historical-price-full/", self.tickers_str)
+            res = self._get_data(url, 
+            additional_params={'from': start_date, 
+                "to": end_date})
+            if isinstance(res, dict):
+                tickers = res.get('symbol')
+                df = pd.concat([pd.Series(d).to_frame().T 
+                    for d in res.get('historical')])
+                df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
+                return df
+            else:
+                return res
+        elif freq in ['1hour', '30min', '15min', '5min', '1min']:
+            url = urljoin(f"historical-chart/{freq}/", self.tickers_str)
+            res = self._get_data(url, 
+            additional_params={'from': start_date, 
+                "to": end_date})
+            if isinstance(res, dict):
+                tickers = res.get('symbol')
+                df = pd.concat([pd.Series(d).to_frame().T 
+                    for d in res.get('historical')])
+                df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
+                return df
+            else: return res
+        else:
+            raise NotImplementedError
+
+    @classmethod
+    def get_historical_price(cls, ticker: Union[str, List[str]],
+        start_date: Union[str, dt.date],
+        end_date: Union[str, dt.date], freq='d'):
+        """classmethod version of historical_price"""
+        return cls(ticker=ticker, 
+            config=DEFAULT_CONFIG).historical_price(start_date=start_date, 
+                end_date=end_date, freq=freq)
