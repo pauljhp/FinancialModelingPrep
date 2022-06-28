@@ -4,7 +4,7 @@ version 0.0.2
 
 ## Change log
 
-- Fixed OSError - path does not exist with logging
+- Added multithreaded pagination for downloading shareholder lists
 
 ## Usage
 
@@ -14,7 +14,7 @@ version 0.0.2
 
 - You can instantiate a Ticker class:
 
-  > from FinancialModelingPrep.ticker import Ticker
+  > from FinancialModelingPrep.tickers import Ticker
   >
 
   > t = Ticker(`<YOUR TICKER>`) # you either input a single ticker (case insentitive), wrap multiple tickers seperated by ",", or wrap multiple tickers in a List[str]
