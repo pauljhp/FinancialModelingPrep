@@ -21,7 +21,7 @@ version 0.0.2
 
     > ```conda create --name <env> --file <this file>```
     
-or your can use the .yml file
+or your can use the .yml file:
 
     > ```conda env create -f environment.yml```
 
