@@ -32,6 +32,8 @@ version 0.0.2
   - funds.Funds for getting information about funds;
   - indices.Index for getting information about indices.
 - All classes inherit from the base class _abstract.AbstractAPI
+- You will also find utility classes, such as utils.utils.TickerSearch, which helps with searching for companies by keywords
+- There is also a graph_construction.ConstructGraph class for constructing a graph from the API
 
 ## Style guide
 
