@@ -7,6 +7,16 @@ version 0.0.2
 - Added multithreaded pagination for downloading shareholder lists
 - Added subpackage for constructing graph from API
 
+## Setup
+- Use conda to manage enviroment.
+- Clone this repository with 
+    > git clone https://github.com/pauljhp/FinancialModelingPrep
+    > cd ./FinancialModelingPrep
+- Create a new environment with:
+    > conda create --name <env> --file <this file>
+    or your can use the .yml file
+    > conda env create -f environment.yml
+
 ## Usage
 
 - All sub modules are designed to work both as modules and as scripts
