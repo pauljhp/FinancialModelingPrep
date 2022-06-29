@@ -13,17 +13,17 @@ version 0.0.2
 
 - Clone this repository with:
 
-    > git clone https://github.com/pauljhp/FinancialModelingPrep
+```$ git clone https://github.com/pauljhp/FinancialModelingPrep```
     
-    > cd ./FinancialModelingPrep
+```$ cd ./FinancialModelingPrep```
     
 - Create a new environment with:
 
-    > ```conda create --name <env> --file <this file>```
+```$ conda create --name <env> --file <this file>```
     
 or your can use the .yml file:
 
-    > ```conda env create -f environment.yml```
+```$ conda env create -f environment.yml```
 
 ## Usage
 
