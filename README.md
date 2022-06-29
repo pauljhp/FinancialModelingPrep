@@ -18,7 +18,10 @@ version 0.0.2
   >
 
   > t = Ticker(`<YOUR TICKER>`) # you either input a single ticker (case insentitive), wrap multiple tickers seperated by ",", or wrap multiple tickers in a List[str]
-  >
+
+- You can also use the class methods without instantiating:
+  > Ticker.get_stock_news(<TICKER>, <start_date>)
+
 - If you have specified a sqlite path, when setting save_to_sql=True, apart from returning a pd.DataFrame, the dataframe will also be written into the sql database
 - You can also call classmethod Ticker().get_income_statements(ticker=`<YOUR TICKER>`) with our instantiating the class
 
