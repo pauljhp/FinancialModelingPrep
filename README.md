@@ -5,10 +5,15 @@ version 0.0.2
 ## Change log
 
 - Added multithreaded pagination for downloading shareholder lists
+- Added subpackage for constructing graph from API
 
 ## Usage
 
 - All sub modules are designed to work both as modules and as scripts
+- FMP API requires an API key, you can either wrap it in a json file like this: 
+  {"apikey": <`YOURAPIKEY`>}
+  And save it in ./.config/config.json.  If you save it somewhere else, you'll have to specify the path when initiating the class.
+- Without specifying the config.json file, the API will prompt you to enter the api key.
 
 ### 1. Ticker Class
 
