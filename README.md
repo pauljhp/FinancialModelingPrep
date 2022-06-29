@@ -31,7 +31,7 @@ version 0.0.2
   - ticker.Ticker for getting stock level information;
   - funds.Funds for getting information about funds;
   - indices.Index for getting information about indices.
-- All classes inherits from the base class _abstract.AbstractAPI
+- All classes inherit from the base class _abstract.AbstractAPI
 
 ## Style guide
 
