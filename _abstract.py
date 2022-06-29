@@ -28,14 +28,24 @@ logging.basicConfig(filename=LOGPATH,
 
 class AbstractAPI(ABC):
     
-    def _get_config(self, config: Union[str, Config]):
+    def _get_config(self, config: Union[str, Config, dict]):
         if isinstance(config, str):
             try:
                 d = json.load(open(config))
                 config = Config(d)
+            except FileNotFoundError as e:
+                logging.error(e)
+                apikey = input("the config file you specified does not exist. Please enter APIKEY (case sensitive): ")
+                config = Config(dict(apikey=apikey))
             except Exception as e:
                 logging.error(e)
                 raise e
+        elif isinstance(config, Config):
+            pass
+        elif isinstance(config, dict): 
+            config = Config(config)
+        else:
+            raise NotImplementedError
         assert isinstance(config, Config)
         return config
 
@@ -61,7 +71,7 @@ class AbstractAPI(ABC):
             return df
 
     def __init__(self, 
-        config: Config=Config, 
+        config: Optional[Union[Config, str]]=None, 
         version: str='v3',
         sql_path: Optional[str]=None,
         ):

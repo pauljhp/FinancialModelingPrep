@@ -4,6 +4,7 @@ from copy import deepcopy
 import pandas as pd
 from typing import Optional, Union, List, Dict, Callable
 from collections import deque
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 from ._abstract import AbstractAPI
@@ -26,7 +27,7 @@ DEFAULT_START_DATE = dt.date(2020, 1, 1)
 
 class Ticker(AbstractAPI):
 
-    def __init__(self, ticker: str, 
+    def __init__(self, ticker: Union[str, List[str]], 
         config: Union[str, Config]=DEFAULT_CONFIG, 
         mode='statements',
         **kwargs):
