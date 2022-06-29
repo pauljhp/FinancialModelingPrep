@@ -519,9 +519,9 @@ class Ticker(AbstractAPI):
             res = self._get_data(url=url, tickers=self.tickers, limit=limit)
         if isinstance(res, list):
             df = pd.concat([pd.Series(d).to_frame().T for d in res])
-            return df
-            df = pandas_strptime(df, 'publishedDate')
-            df.set_index('publishedDate')
+            df = pandas_strptime(df, index_name="publishedDate", axis=1, 
+                datetime_format="%Y-%m-%d %H:%M:%S") 
+            df = df.set_index(['symbol', 'publishedDate'])
             return df
 
     @classmethod
