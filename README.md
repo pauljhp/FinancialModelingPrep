@@ -42,7 +42,8 @@ or your can use the .yml file:
 ```
 
 - You can also use the class methods without instantiating:
-```>>> Ticker.get_stock_news(<`TICKER`>, <`start_date`>)```
+
+```>>> Ticker.get_stock_news(<TICKER>, <start_date>)```
 
 - If you have specified a sqlite path, when setting save_to_sql=True, apart from returning a pd.DataFrame, the dataframe will also be written into the sql database
 - You can also call classmethod Ticker().get_income_statements(ticker=`<YOUR TICKER>`) with our instantiating the class
