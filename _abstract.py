@@ -24,7 +24,8 @@ if not os.path.exists(LOGPATH):
     os.makedirs(LOGPATH)
 
 logging.basicConfig(filename=LOGFILE, 
-    encoding='utf-8', level=logging.DEBUG)
+    # encoding='utf-8', 
+    level=logging.DEBUG)
 
 
 class AbstractAPI(ABC):
