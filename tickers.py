@@ -374,6 +374,8 @@ class Ticker(AbstractAPI):
             raise NotImplementedError
         if isinstance(res, list):
             df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            df = pandas_strptime(df, index_name='date', axis=1)
+            df = df.set_index(["symbol", "date", "period"])
             return df
         else:
             return res
