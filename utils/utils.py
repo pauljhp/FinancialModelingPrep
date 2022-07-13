@@ -138,15 +138,35 @@ class TickerSearch(AbstractAPI):
 
     def _search_name(self, keyword: str, limit: int=10,
         exchange: str='NASDAQ'):
-        url = "search-name"
-        return self._get_data(url=url, quary=keyword,
-            limit=limit, exchange=exchange)
+        """
+        :param exchange: takes the following:
+            'ETF' 'MUTUAL_FUND' 'COMMODITY' 'INDEX' 'CRYPTO' 'FOREX' 'TSX' 
+            'AMEX' 'NASDAQ' 'NYSE' 'EURONEXT' 'XETRA' 'NSE' 'LSE', and 'ALL'
+        """
+        available_exchanges = ['ETF', 'MUTUAL_FUND', 'COMMODITY', 'INDEX', 
+            'CRYPTO', 'FOREX', 'TSX', 'AMEX', 'NASDAQ', 'NYSE', 'EURONEXT', 
+            'XETRA' 'NSE' 'LSE', 'ALL']
+        assert exchange in availalbe_exchanges, "the exchange you specified is not available"
+        if exchange == 'ALL':
+            raise NotImplementedError 
+        else:
+            url = "search-name"
+            return self._get_data(url=url, quary=keyword,
+                limit=limit, exchange=exchange)
     
     @classmethod
     def search_name(cls, keyword: str, limit: int=10,
         exchange: str='NASDAQ'):
+        """classmethod version of _search_name"""
         return cls()._search_name(keyword, limit, exchange)
+
+    
 
 def equity_screener(mcap_ub: Union[int, float]):
     # TODO
     raise NotImplementedError
+
+########################
+### cyclical imports ###
+########################
+from ..tickers import Ticker

@@ -1,0 +1,21 @@
+name: filing_env
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - requests
+  - bs4
+  - pandas
+  - numpy
+  - jupyter
+  - jupyterlab
+  - lxml
+  - html5lib
+  - spacy
+  - scipy
+  - dill
+  - matplotlib
+  - openpyxl
+  - dask
+  - networkx
+prefix: C:\users\p.peng\anaconda3\envs\filing_env

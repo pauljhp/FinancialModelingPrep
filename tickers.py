@@ -7,9 +7,11 @@ from collections import deque
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
+from argparse import ArgumentParser
+from pathlib import Path
 from ._abstract import AbstractAPI
 from .utils.config import Config
-from .utils.utils import pandas_strptime
+from .utils.utils import pandas_strptime, iter_by_chunk
 
 
 DEFAULT_CONFIG = "./FinancialModelingPrep/.config/config.json"
@@ -27,9 +29,10 @@ DEFAULT_START_DATE = dt.date(2020, 1, 1)
 
 class Ticker(AbstractAPI):
 
-    def __init__(self, ticker: Union[str, List[str]], 
+    def __init__(self, ticker: Optional[Union[str, List[str]]]=None, 
         config: Union[str, Config]=DEFAULT_CONFIG, 
         mode='statements',
+        ignore_unavailable_tickers: bool=False,
         **kwargs):
         super(Ticker, self).__init__(config=config,
             **kwargs)
@@ -38,18 +41,25 @@ class Ticker(AbstractAPI):
             if "," in ticker: 
                 tickers = ticker.upper().split(",")
                 tickers = [t.strip() for t in tickers]
-                assert len(tickers) == sum([t in self.available_tickers 
-                    for t in tickers]), \
-                    f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
+                if not ignore_unavailable_tickers:
+                    assert len(tickers) == sum([t in self.available_tickers 
+                        for t in tickers]), \
+                        f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
                 self.tickers = tickers
             else:
-                assert ticker.upper().strip() in [t.upper() for t in self.available_tickers], "Not a valid ticker!"
+                if not ignore_unavailable_tickers:
+                    assert ticker.upper().strip() in [t.upper() for t in self.available_tickers], "Not a valid ticker!"
                 self.tickers = [ticker.upper()]
         elif isinstance(ticker, list):
-            assert len(ticker) == sum([str(t).upper().strip() in self.available_tickers 
-                    for t in ticker]), \
-                    f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
+            if not ignore_unavailable_tickers:
+                assert len(ticker) == sum([str(t).upper().strip() in self.available_tickers 
+                        for t in ticker]), \
+                        f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
             self.tickers = [str(t).upper() for t in ticker]
+        elif ticker is None: # special instantiation without ticker only allowed for using the all_company_profiles class method
+            self.classmethod_mode = True
+            self.tickers = ""
+            print("Ticker unspecified. Only get_all_company_profiles method will work in this mode")
         else:
             raise TypeError("ticker must be a string or a list of strings")
         self.tickers_str = ",".join(self.tickers)
@@ -99,13 +109,21 @@ class Ticker(AbstractAPI):
         else:
             raise TypeError("value returned from API is not a list")
 
-    def get_income_statements(self, freq="A", save_to_sql: bool=False, 
+    def income_statements(self, freq: int="A", 
+        save_to_sql: bool=False, 
         limit: int=100) -> Optional[pd.DataFrame]:
         """get income statement
         :param freq: takes 'A' or 'Q'
         """
         return self.__get_statements(statement='income', 
             freq=freq, save_to_sql=save_to_sql, limit=limit)
+
+    @classmethod
+    def get_income_statements(cls, tickers, config, 
+        freq: int='A',
+        limit: int=100):
+        """classmethod version of income_statement. Doesn't allow save_to_sql"""
+        return cls(tickers=tickers, config=config).income_statements(freq=freq, limit=limit)
 
     def get_balance_sheet(self, freq="A", save_to_sql: bool=False, 
         limit: int=100) -> Optional[pd.DataFrame]:
@@ -123,7 +141,7 @@ class Ticker(AbstractAPI):
         return self.__get_statements(statement='cashflow', 
             freq=freq, save_to_sql=save_to_sql, limit=limit)
     
-    def get_product_segments(self, freq='A'):
+    def product_segments(self, freq='A') -> Union[Dict, List]:
         """get the product segments for the ticker
         :param freq: takes 'A' or 'Q'
 
@@ -146,7 +164,14 @@ class Ticker(AbstractAPI):
         self.endpoint = endpoint # set endpoint back to v3
         return d
 
-    def get_geo_segments(self, freq='A'):
+    @classmethod
+    def get_product_segments(cls, ticker: Union[str, List[str]], 
+        config: Union[str, Config]=DEFAULT_CONFIG,
+        freq: str='A'):
+        """classmethod version of self.product_segments()"""
+        return cls(ticker=ticker, config=config).product_segments(freq=freq)
+
+    def geo_segments(self, freq='A') -> Union[Dict, List]:
         """get the geographical segments for the ticker
         :param freq: takes 'A' or 'Q'
 
@@ -169,7 +194,14 @@ class Ticker(AbstractAPI):
         self.endpoint = endpoint # set endpoint back to v3
         return d
 
-    def get_transcripts(self, year: int, quarter: Optional[int]=None):
+    @classmethod
+    def get_geo_segments(cls, ticker: Union[str, List[str]], 
+        config: Union[str, Config]=DEFAULT_CONFIG,
+        freq: str='A'):
+        """classmethod version of geo_segments"""
+        return cls(ticker=ticker, config=config).geo_segments(freq=freq)
+
+    def transcripts(self, year: int, quarter: Optional[int]=None):
         """get earnings call transcript
         :param year: year of the earnings call
         :param quarter: takes 1, 2, 3, 4
@@ -186,16 +218,16 @@ class Ticker(AbstractAPI):
         return res
 
     @classmethod
-    def download_transcripts(cls, ticker: str, 
+    def get_transcripts(cls, ticker: str, 
         year: int, quarter: Optional[int]=None):
         """classmethod version of get_transcripts. Takes the same arguments
         To use this, you must make sure the apikey is saved through:
             ./FinancialModelingPrep/.config/config.json
         Otherwise the api will not return
         """
-        return cls(ticker, DEFAULT_CONFIG).get_transcripts(year=year, quarter=quarter)
+        return cls(ticker, DEFAULT_CONFIG).transcripts(year=year, quarter=quarter)
 
-    def get_inst_ownership(self, incl_cur_q: bool=True, 
+    def inst_ownership(self, incl_cur_q: bool=True, 
         save_to_sql: bool=False,):
         """get number of shares held by institutional shareholders disclosed 
         through 13F
@@ -226,12 +258,12 @@ class Ticker(AbstractAPI):
             raise TypeError("value returned from API is not a list")
 
     @classmethod
-    def list_inst_ownership(cls, ticker: str, incl_cur_q: bool=True):
+    def get_inst_ownership(cls, ticker: str, incl_cur_q: bool=True):
         """classmethod version of get_ownership"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_inst_ownership(incl_cur_q=incl_cur_q)
+            config=DEFAULT_CONFIG).inst_ownership(incl_cur_q=incl_cur_q)
 
-    def get_inst_owners(self, year: int=CUR_YEAR,
+    def inst_owners(self, year: int=CUR_YEAR,
         quarter: int=LAST_Q,
         save_to_sql: bool=False,
         max_workers: int=8) -> Optional[pd.DataFrame]:
@@ -292,11 +324,11 @@ class Ticker(AbstractAPI):
             raise TypeError("value returned from API is not a list")
 
     @classmethod
-    def list_inst_owners(cls, ticker: str, year: int=CUR_YEAR, 
+    def get_inst_owners(cls, ticker: str, year: int=CUR_YEAR, 
         quarter: int=LAST_Q, max_workers: int=8):
-        """classmethod version of get_ownership"""
+        """classmethod version of self.inst_owners()"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_inst_owners(year=year, 
+            config=DEFAULT_CONFIG).inst_owners(year=year, 
                 quarter=quarter, max_workers=max_workers)
 
     def __get_v4_info(self, url: str) -> Dict:
@@ -307,26 +339,32 @@ class Ticker(AbstractAPI):
         self.endpoint = endpoint
         return res
 
-    def get_peers(self) -> List[str]:
+    def peers(self) -> List[str]:
         """get the stock's peers"""
         url = "stock_peers"
         res = self.__get_v4_info(url=url)
         return res
 
     @classmethod
-    def list_peers(cls, ticker: Union[str, List[str]]) -> List[str]:
+    def get_peers(cls, ticker: Union[str, List[str]]) -> List[str]:
         """classmethod version of get_peers"""
         res = cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_peers()
+            config=DEFAULT_CONFIG).peers()
         return res
 
-    def get_core_info(self) -> Dict:
+    def core_info(self) -> Dict:
         """get the stock's core information such as cik, exchange, industry"""
         url = "company-core-information"
         res = self.__get_v4_info(url=url)
         return res
 
-    def get_profile(self):
+    @classmethod
+    def get_core_info(cls, ticker: Union[str, List[str]], 
+        config: Union[str, Config]=DEFAULT_CONFIG):
+        """classmethod version of self.core_info()"""
+        return cls(ticker=ticker, config=config).core_info()
+
+    def company_profile(self):
         """get company's profile information"""
         url = urljoin("profile/", ",".join(self.tickers))
         res = self._get_data(url=url)
@@ -337,13 +375,47 @@ class Ticker(AbstractAPI):
         else: return res
 
     @classmethod
-    def company_profile(cls, ticker: Union[str, List[str]]) -> Dict[str, float]:
+    def get_company_profile(cls, ticker: Union[str, List[str]]) -> Dict[str, float]:
         """classmethod version of get_profile"""
         res = cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_profile()
+            config=DEFAULT_CONFIG).company_profile()
         return res
 
-    def get_execs(self) -> Union[pd.DataFrame, Dict]:
+    @classmethod
+    def get_all_company_profiles(cls, tickers=None,
+        limit: int=100000, 
+        max_workers=16,
+        sql_path: Optional[str]=None) -> pd.DataFrame:
+        """returns dataframe containing all the companies up to a limit
+        :param limit: max number of tickers to be sent at once
+        :param max_workers: max workers for concurrent operation if limmit is 
+            set to higher than 1000
+        """
+        max_len = 1000 # FinancialModelingPrep takes max 1000 tickers at a time
+        available_tickers = cls().available_tickers
+        if limit <= max_len:
+            tickers = ",".join(available_tickers[:limit])
+            res = cls(ticker=tickers, 
+                config=DEFAULT_CONFIG, 
+                ignore_unavailable_tickers=True).company_profile()
+            
+        else:
+            fn = lambda ls: cls(ticker=",".join(ls), 
+                config=DEFAULT_CONFIG,
+                ignore_unavailable_tickers=True).company_profile()
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [executor.submit(fn, chunk) 
+                for chunk in iter_by_chunk(available_tickers[:limit], max_len)]
+                res = pd.concat([future.result() for future in futures])
+        
+        if sql_path:
+            cls(ticker=tickers, 
+                config=DEFAULT_CONFIG, 
+                ignore_unavailable_tickers=True,
+                sql_path=sql_path).pandas_to_sql(res, table_name='all_company_profiles')
+        return res
+
+    def list_execs(self) -> Union[pd.DataFrame, Dict]:
         """get list of key executives, their positions and bios"""
         url = urljoin("key-executives/", ",".join(self.tickers))
         res = self._get_data(url=url)
@@ -354,12 +426,12 @@ class Ticker(AbstractAPI):
         else: return res
     
     @classmethod
-    def list_execs(cls, ticker: Union[str, List[str]]):
+    def get_list_execs(cls, ticker: Union[str, List[str]]):
         """classmethod version of get_execs"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_execs()
+            config=DEFAULT_CONFIG).list_execs()
 
-    def get_financial_ratios(self, limit: int=10, 
+    def financial_ratios(self, limit: int=10, 
         freq: str="A") -> Union[pd.DataFrame, Dict]:
         """get financial ratios in the statements
         :param limit: number of period going back
@@ -381,13 +453,13 @@ class Ticker(AbstractAPI):
             return res
 
     @classmethod
-    def download_financial_ratios(cls, ticker: str, 
+    def get_financial_ratios(cls, ticker: str, 
         limit: int=10, freq: str='A') -> Union[pd.DataFrame, list]:
         """classmethod version of get_financial_ratios"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_financial_ratios(limit=limit, freq=freq)
+            config=DEFAULT_CONFIG).financial_ratios(limit=limit, freq=freq)
 
-    def get_key_metrics(self, limit: int=10, 
+    def key_metrics(self, limit: int=10, 
         freq: int='A') -> Union[pd.DataFrame, Dict]:
         """get the key metrics such as key financial ratios and valuation
         :param limit: going back how many period 
@@ -408,13 +480,13 @@ class Ticker(AbstractAPI):
             return res
     
     @classmethod
-    def list_key_metrics(cls, ticker:str, limit: int=10,
+    def get_key_metrics(cls, ticker:str, limit: int=10,
         freq: int='A') -> Union[pd.DataFrame, Dict]:
         """classmethod version of get_key_metrics"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_key_metrics(limit=limit, freq=freq)
+            config=DEFAULT_CONFIG).key_metrics(limit=limit, freq=freq)
     
-    def get_financial_growth(self, limit: int=10, 
+    def financial_growth(self, limit: int=10, 
         freq: int='A') -> Union[pd.DataFrame, Dict]:
         """get the growth of key fundamental measures
         :param limit: going back how many period 
@@ -436,11 +508,11 @@ class Ticker(AbstractAPI):
             return res
 
     @classmethod
-    def list_financial_growth(cls, ticker:str, limit: int=10,
+    def get_financial_growth(cls, ticker:str, limit: int=10,
         freq: int='A') -> Union[pd.DataFrame, Dict]:
         """classmethod version of get_financial_growth"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_financial_growth(limit=limit, freq=freq)
+            config=DEFAULT_CONFIG).financial_growth(limit=limit, freq=freq)
     
     def current_price(self):
         """get current quote price"""
@@ -538,3 +610,23 @@ class Ticker(AbstractAPI):
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).stock_news(start_date=start_date, 
                 limit=limit)
+
+def main(ticker: Optional[Union[str, List[str]]]=None, 
+        action: str='get_all_company_profiles',
+        sql_path: Optional[str]=None):
+    exec(f"Ticker.{action}(tickers={ticker}, sql_path='{sql_path}')")
+
+if __name__ == '__main__':
+    parser = ArgumentParser()
+    parser.add_argument("-a", "--action", type=str,
+        default="get_all_company_profiles")
+    parser.add_argument("-t", "--ticker", type=str, default=None)
+    parser.add_argument("-s", "--sql_path", type=str)
+    parser.add_argument("-k", "--apikey", type=str)
+    args = parser.parse_args()
+    config_p = Path(DEFAULT_CONFIG)
+    if not config_p.exists:
+        config_p.parent.mkdir(parents=True, exist_ok=True)
+        config_p.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=args.apikey))
+
+    main(args.ticker, args.action, args.sql_path)

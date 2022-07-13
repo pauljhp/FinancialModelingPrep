@@ -36,7 +36,7 @@ class ConstructGraph:
                 for chunk in iter_by_chunk(self.ticker_list, 
                     batch_request_max * max_workers):
                     chunk = list(chunk)
-                    futures = [executor.submit(Ticker.list_peers, list(subchunk)) for 
+                    futures = [executor.submit(Ticker.get_peers, list(subchunk)) for 
                         subchunk in iter_by_chunk(chunk, batch_request_max)
                         ]
                     for future in as_completed(futures):
@@ -44,7 +44,7 @@ class ConstructGraph:
         else:
             for chunk in iter_by_chunk(self.ticker_list, batch_request_max):
                 chunk = list(chunk)
-                res += Ticker.list_peers(chunk)
+                res += Ticker.get_peers(chunk)
         if return_type in ['json']:
             return res
         else:
@@ -63,9 +63,18 @@ class ConstructGraph:
                 if return_type == 'graph':
                     return G
                 elif return_type == 'adj_mt':
-                    return G.to_pandas_adjacency()
+                    return nx.to_pandas_adjacency(G)
                 else:
                     raise NotImplementedError
             else:
                 raise NotImplementedError
-            
+
+    @classmethod
+    def get_peers_graph(cls, ticker_list: Optional[Union[str, List[str]]]=None,
+        return_type: str='graph', 
+        directed: bool=True, max_workers: int=8, 
+        batch_request_max: int=30):
+        return cls(ticker_list=ticker_list).peers_graph(return_type=return_type, 
+            directed=directed, batch_request_max=batch_request_max)
+
+    # def ownership_graph(self, return_type: str='graph',)
