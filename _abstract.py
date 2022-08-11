@@ -123,12 +123,12 @@ class AbstractAPI(ABC):
                     raise e
 
     def pandas_to_sql(self, pandas_obj: Union[pd.Series, pd.DataFrame],
-        table_name: str):
+        table_name: str, **kwargs):
         """
         :param pandas_obj: The pandas object to save to sql.
         :param table_name: The name of the table to save to.
         """
-        pandas_obj.to_sql(table_name, self.sql_conn, if_exists='replace')
+        pandas_obj.to_sql(table_name, self.sql_conn, **kwargs)
         self.sql_conn.commit()
 
     @classmethod

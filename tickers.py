@@ -27,6 +27,11 @@ CUR_YEAR = TODAY.year
 LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
 DEFAULT_START_DATE = dt.date(2020, 1, 1)
 
+config_p = Path(DEFAULT_CONFIG)
+if not config_p.exists():
+    config_p.parent.mkdir(parents=True, exist_ok=True)
+    config_p.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=input("the config file wasn't found - enter your apikey: ")))
+
 class Ticker(AbstractAPI):
 
     def __init__(self, ticker: Optional[Union[str, List[str]]]=None, 
@@ -64,8 +69,8 @@ class Ticker(AbstractAPI):
             raise TypeError("ticker must be a string or a list of strings")
         self.tickers_str = ",".join(self.tickers)
 
-    def __get_statements(self, statement='income', 
-        freq="A", 
+    def __get_statements(self, statement: str='income', 
+        freq: str="A", 
         save_to_sql: bool=False, 
         limit: int=100) -> Optional[pd.DataFrame]:
         """interface for getting income/balance sheet/cash flow statements
@@ -643,7 +648,7 @@ if __name__ == '__main__':
     parser.add_argument("-k", "--apikey", type=str)
     args = parser.parse_args()
     config_p = Path(DEFAULT_CONFIG)
-    if not config_p.exists:
+    if not config_p.exists():
         config_p.parent.mkdir(parents=True, exist_ok=True)
         config_p.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=args.apikey))
 
