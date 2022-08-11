@@ -4,6 +4,7 @@ import numpy as np
 from typing import Union, Optional, Any, Dict, List
 from copy import deepcopy
 import networkx as nx
+from pathlib import Path
 from .._abstract import AbstractAPI
 from .config import Config
 import itertools
@@ -109,64 +110,64 @@ def iter_by_chunk(iterable: Any, chunk_size: int):
             break
         yield chunk
 
-class TickerSearch(AbstractAPI):
-    """class for searching for a ticker via keywords"""
-    def __init__(self):
-        super(TickerSearch, self).__init(config=DEFAULT_CONFIG)
+# class TickerSearch(AbstractAPI):
+#     """class for searching for a ticker via keywords"""
+#     def __init__(self):
+#         super(TickerSearch, self).__init(config=DEFAULT_CONFIG)
     
-    def _search(self, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        url = "search"
-        return self._get_data(url=url, quary=keyword,
-            limit=limit, exchange=exchange)
+#     def _search(self, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         url = "search"
+#         return self._get_data(url=url, quary=keyword,
+#             limit=limit, exchange=exchange)
 
-    @classmethod
-    def search(cls, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        return cls()._search(keyword, limit, exchange)
+#     @classmethod
+#     def search(cls, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         return cls()._search(keyword, limit, exchange)
 
-    def _search_ticker(self, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        url = "search-ticker"
-        return self._get_data(url=url, quary=keyword,
-            limit=limit, exchange=exchange)
+#     def _search_ticker(self, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         url = "search-ticker"
+#         return self._get_data(url=url, quary=keyword,
+#             limit=limit, exchange=exchange)
 
-    @classmethod
-    def search_ticker(cls, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        return cls()._search_ticker(keyword, limit, exchange)
+#     @classmethod
+#     def search_ticker(cls, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         return cls()._search_ticker(keyword, limit, exchange)
 
-    def _search_name(self, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        """
-        :param exchange: takes the following:
-            'ETF' 'MUTUAL_FUND' 'COMMODITY' 'INDEX' 'CRYPTO' 'FOREX' 'TSX' 
-            'AMEX' 'NASDAQ' 'NYSE' 'EURONEXT' 'XETRA' 'NSE' 'LSE', and 'ALL'
-        """
-        available_exchanges = ['ETF', 'MUTUAL_FUND', 'COMMODITY', 'INDEX', 
-            'CRYPTO', 'FOREX', 'TSX', 'AMEX', 'NASDAQ', 'NYSE', 'EURONEXT', 
-            'XETRA' 'NSE' 'LSE', 'ALL']
-        assert exchange in availalbe_exchanges, "the exchange you specified is not available"
-        if exchange == 'ALL':
-            raise NotImplementedError 
-        else:
-            url = "search-name"
-            return self._get_data(url=url, quary=keyword,
-                limit=limit, exchange=exchange)
+#     def _search_name(self, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         """
+#         :param exchange: takes the following:
+#             'ETF' 'MUTUAL_FUND' 'COMMODITY' 'INDEX' 'CRYPTO' 'FOREX' 'TSX' 
+#             'AMEX' 'NASDAQ' 'NYSE' 'EURONEXT' 'XETRA' 'NSE' 'LSE', and 'ALL'
+#         """
+#         available_exchanges = ['ETF', 'MUTUAL_FUND', 'COMMODITY', 'INDEX', 
+#             'CRYPTO', 'FOREX', 'TSX', 'AMEX', 'NASDAQ', 'NYSE', 'EURONEXT', 
+#             'XETRA' 'NSE' 'LSE', 'ALL']
+#         assert exchange in availalbe_exchanges, "the exchange you specified is not available"
+#         if exchange == 'ALL':
+#             raise NotImplementedError 
+#         else:
+#             url = "search-name"
+#             return self._get_data(url=url, quary=keyword,
+#                 limit=limit, exchange=exchange)
     
-    @classmethod
-    def search_name(cls, keyword: str, limit: int=10,
-        exchange: str='NASDAQ'):
-        """classmethod version of _search_name"""
-        return cls()._search_name(keyword, limit, exchange)
+#     @classmethod
+#     def search_name(cls, keyword: str, limit: int=10,
+#         exchange: str='NASDAQ'):
+#         """classmethod version of _search_name"""
+#         return cls()._search_name(keyword, limit, exchange)
 
     
 
-def equity_screener(mcap_ub: Union[int, float]):
-    # TODO
-    raise NotImplementedError
+# def equity_screener(mcap_ub: Union[int, float]):
+#     # TODO
+#     raise NotImplementedError
 
-########################
-### cyclical imports ###
-########################
-from ..tickers import Ticker
+# ########################
+# ### cyclical imports ###
+# ########################
+# from ..tickers import Ticker

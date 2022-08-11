@@ -5,6 +5,7 @@ data/
 ## Protected files
 .config/
 .log/
+experimental/
 
 
 # Byte-compiled / optimized / DLL files

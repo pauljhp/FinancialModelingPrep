@@ -171,7 +171,7 @@ class Ticker(AbstractAPI):
         """classmethod version of self.product_segments()"""
         return cls(ticker=ticker, config=config).product_segments(freq=freq)
 
-    def geo_segments(self, freq='A') -> Union[Dict, List]:
+    def geo_segments(self, freq='A', **kwargs) -> Union[Dict, List]:
         """get the geographical segments for the ticker
         :param freq: takes 'A' or 'Q'
 
@@ -184,10 +184,10 @@ class Ticker(AbstractAPI):
         self.endpoint = endpoint.replace("v3", "v4")
         url = "revenue-geographic-segmentation/"
         if freq == 'A':
-            d = self._get_data(url=url, ticker=",".join(self.tickers))
+            d = self._get_data(url=url, ticker=",".join(self.tickers), **kwargs)
         elif freq == 'Q':
             d = self._get_data(url=url, ticker=",".join(self.tickers), 
-                period='quarter')
+                period='quarter', **kwargs)
         else:
             self.endpoint = endpoint
             raise NotImplementedError
@@ -197,9 +197,10 @@ class Ticker(AbstractAPI):
     @classmethod
     def get_geo_segments(cls, ticker: Union[str, List[str]], 
         config: Union[str, Config]=DEFAULT_CONFIG,
-        freq: str='A'):
+        freq: str='A', structure='flat', **kwargs):
         """classmethod version of geo_segments"""
-        return cls(ticker=ticker, config=config).geo_segments(freq=freq)
+        return cls(ticker=ticker, config=config).geo_segments(freq=freq, 
+            structure='flat', **kwargs)
 
     def transcripts(self, year: int, quarter: Optional[int]=None):
         """get earnings call transcript
@@ -610,6 +611,23 @@ class Ticker(AbstractAPI):
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).stock_news(start_date=start_date, 
                 limit=limit)
+
+    def earnings_surprises(self) -> Optional[pd.DataFrame]:
+        """get earnings surprise data"""
+        res = self._get_data(url=f'earnings-surprises/{self.tickers_str}')
+        if isinstance(res, list):
+            df = pd.concat([pd.Series(d).to_frame().T for d in res])
+            df = pandas_strptime(df, axis=1, index_name="date")
+            df = df.set_index("date")
+            df.loc[:, "delta"] = df.actualEarningResult / df.estimatedEarning - 1
+            # 
+            return df
+    
+    @classmethod
+    def get_earnings_surprises(cls, tickers: Union[str, List[str]]
+        ) -> Optional[pd.DataFrame]:
+        return cls(ticker=tickers, 
+            config=DEFAULT_CONFIG).earnings_surprises()
 
 def main(ticker: Optional[Union[str, List[str]]]=None, 
         action: str='get_all_company_profiles',
