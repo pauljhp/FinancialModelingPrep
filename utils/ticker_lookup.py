@@ -361,6 +361,14 @@ class TickerLookup(AbstractAPI):
         bbg_ticker = f"{ticker_data.ticker_wo_exch_code} {bbg_exch_code} Equity"
         return bbg_ticker
 
-    def bbg2fmpticker(self, bbgticker: str) -> Union[None, str]:
+    @classmethod
+    def fmp2bbgticker(cls, fmpticker: str) -> Union[None, str]:
+        return cls()._fmp2bbgticker(fmpticker)
+
+    def _bbg2fmpticker(self, bbgticker: str) -> Union[None, str]:
         # TODO - add reverse lookup from BBG to FMP - more difficult, requires lookup
         raise NotImplementedError
+    
+    @classmethod
+    def bbg2fmpticker(cls, bbgticker: str) -> Union[None, str]:
+        return cls()._bbg2fmpticker(bbgticker)
