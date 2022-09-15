@@ -15,6 +15,7 @@ from .utils.config import Config
 import datetime as dt
 import logging
 import sqlite3
+from pathlib import Path
 from copy import deepcopy
 
 LOGPATH = './FinancialModelingPrep/.log/'
@@ -31,6 +32,8 @@ logging.basicConfig(filename=LOGFILE,
 class AbstractAPI(ABC):
     
     def _get_config(self, config: Union[str, Config, dict]):
+        if isinstance(config, Path):
+            config = config.as_posix()
         if isinstance(config, str):
             try:
                 d = json.load(open(config))

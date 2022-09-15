@@ -1,3 +1,39 @@
+from __future__ import annotations
+from typing import (Union, 
+  Optional,
+  List,
+  Dict,
+  Sequence,
+  Iterable,
+  Callable
+  )
+from collections import Counter
+import json
+from urllib.parse import urlparse, urljoin
+from pathlib import Path
+import logging
+import pandas as pd
+import numpy as np
+from .._abstract import AbstractAPI
+
+
+LOGPATH = Path('./FinancialModelingPrep/.log/')
+LOGFILE = LOGPATH.joinpath('log.log')
+
+if not LOGFILE.exists():
+    LOGFILE.touch(exist_ok=False)
+
+logging.basicConfig(filename=LOGFILE, 
+    # encoding='utf-8', 
+    level=logging.DEBUG)
+
+DEFAULT_CONFIG = Path("./FinancialModelingPrep/.config/config.json")
+
+if not DEFAULT_CONFIG.exists():
+    DEFAULT_CONFIG.parent.mkdir(parents=True, exist_ok=True)
+    DEFAULT_CONFIG.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=input("the config file wasn't found - enter your apikey: ")))
+
+
 BBG_EXCH_LOOKUP = {'AQSE': 'PZ',
   'Abidjan': 'IA',
   'Albania': 'AL',
@@ -217,3 +253,114 @@ BBG_EXCH_LOOKUP = {'AQSE': 'PZ',
   'Yemen': 'YS',
   'Zambia': 'ZL',
   'Zimbabwe': 'ZH'}
+
+FMP_EXCH_LOOKUP = {'London Stock Exchange': 'United Kingdom', 
+  'New York Stock Exchange': 'United States', 
+  'Tokyo': 'Japan', 
+  'HKSE': 'HK', 
+  'Other OTC': None, 
+  'National Stock Exchange of India': 'India', 
+  'NASDAQ Capital Market': 'United States', 
+  'Shanghai': 'China', 
+  'New York Stock Exchange Arca': 'United States', 
+  'NASDAQ Global Select': 'United States', 
+  'Shenzhen': 'China', 
+  'XETRA': "Germany", 
+  'NASDAQ Global Market': 'United States', 
+  'Toronto Stock Exchange': 'Canada', 
+  'Nasdaq Capital Market': 'United States', 
+  'Taiwan': 'Taiwan', 
+  'Paris': 'France', 
+  'KSE': 'KSE', 
+  'Stockholm Stock Exchange': 'Sweden', 
+  'Jakarta Stock Exchange': 'Indonesia', 
+  'BATS': "United States", 
+  'São Paulo': 'Brazil', 
+  'Frankfurt': "Germany", 
+  'Warsaw Stock Exchange': 'Poland', 
+  'Swiss Exchange': 'Switzerland', 
+  'Milan': 'Italy', 
+  'Saudi': 'Saudi Arabia', 
+  'American Stock Exchange': 'United States', 
+  'Johannesburg': "South Africa", 
+  'Oslo Stock Exchange': "Norway", 
+  'Amsterdam': "Netherlands", 
+  'Thailand': "Thailand", 
+  'Helsinki': "Finland", 
+  'SES': "Singapore", 
+  'Copenhagen': "Denmark", 
+  'KOSDAQ': "Korea", 
+  'Tel Aviv': "Isreal", 
+  'Brussels': "Belgium", 
+  'Taipei Exchange': "Taiwan", 
+  'Nasdaq': "United States", 
+  'Madrid Stock Exchange': "Spain", 
+  'Istanbul Stock Exchange': "Turkey", 
+  'Mexico': "Mexico", 
+  'NZSE': "New Zealand", 
+  'TSXV': "Canada", 
+  'Lisbon': "Portugal", 
+  'IOB': "United Kingdom", 
+  'Qatar': "Qatar", 
+  'Irish': "Ireland", 
+  'Santiago': "Chile", 
+  'Vienna': "Austria", 
+  'Canadian Sec': "Canada", 
+  'Athens': "Greece", 
+  'Iceland': "Iceland", 
+  'Prague': "Czech Republic", 
+  'Dubai': "UAE", 
+  'Dusseldorf': "Germany", 
+  'Munich': "Germany", 
+  'Stuttgart': "Germany", 
+  'Hamburg': "Germany", 
+  'Budapest': "Hungary", 
+  'Berlin': "Germany", 
+  'Buenos Aires': "Argentina", 
+  'Nasdaq Global Select': 'United States', 
+  'LSE': "United Kingdom", 
+  'FTSE Index': "United Kingdom", 
+  'Stockholm': "Sweden", 
+  'NYSE American': 'United States', 
+  'NasdaqGS': 'United States', 
+  'Tallinn': "Estonia", 
+  'Fukuoka': "Japan", 
+  'NEO': "Canada", 
+  'CCC': None}
+
+
+class TickerLookup(AbstractAPI):
+    """class for converting tickers between BBG and FMP
+    Note:
+    - Convering FMP to BBG relatively easy as FMP uses exchange codes, while 
+        BBG tickers usually is country code. 
+    - If supplied BBG ticker is only country code, a lookup is required and 
+        there may be multiple results returned
+    """
+    def __init__(self, 
+        mode='statements',
+        config=DEFAULT_CONFIG,
+        **kwargs):
+        super(TickerLookup, self).__init__(
+            config=config,
+            **kwargs)
+        endpoint = urljoin(self._endpoint, "stock/list/")
+        all_tickers_ls = self._get_data(url=endpoint)
+        self.all_tickers = pd.concat(
+            [pd.Series(s).to_frame().T 
+            for s in all_tickers_ls])
+        self.all_tickers.loc[:, "ticker_wo_exch_code"] = \
+            self.all_tickers.symbol.apply(lambda x: str(x).split(".")[0])
+
+    def _fmp2bbgticker(self, fmpticker: str) -> Union[None, str]:
+        """converts FMP tickers to BBG tickers"""
+        assert fmpticker.lower() in self.all_tickers.symbol.str.lower().values, f"Ticker {fmpticker} is not available!"
+        ticker_data = self.all_tickers.query("`symbol`==@fmpticker").iloc[0]
+        country = FMP_EXCH_LOOKUP.get(ticker_data.exchange)
+        bbg_exch_code = BBG_EXCH_LOOKUP.get(country)
+        bbg_ticker = f"{ticker_data.ticker_wo_exch_code} {bbg_exch_code} Equity"
+        return bbg_ticker
+
+    def bbg2fmpticker(self, bbgticker: str) -> Union[None, str]:
+        # TODO - add reverse lookup from BBG to FMP - more difficult, requires lookup
+        raise NotImplementedError
