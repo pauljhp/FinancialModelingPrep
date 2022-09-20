@@ -135,7 +135,7 @@ class Ticker(AbstractAPI):
         limit: int=100):
         """classmethod version of `income_statement`. 
         Doesn't allow save_to_sql"""
-        return cls(tickers=tickers, config=config)\
+        return cls(ticker=tickers, config=config)\
             .income_statements(freq=freq, limit=limit)
 
     def balance_sheet(self, 
@@ -156,7 +156,7 @@ class Ticker(AbstractAPI):
         limit: int=100
         ):
         """classmethod version of `balance_sheet`"""
-        return cls(tickers=tickers, config=config)\
+        return cls(ticker=tickers, config=config)\
             .income_statements(freq=freq, limit=limit)
 
     def cashflow(self, 
@@ -177,7 +177,7 @@ class Ticker(AbstractAPI):
         limit: int=100
         ):
         """classmethod version of `cashflow`"""
-        return cls(tickers=tickers, config=config)\
+        return cls(ticker=tickers, config=config)\
             .cashflow(freq=freq, limit=limit)
     
     def product_segments(self, freq='A') -> Union[Dict, List]:
