@@ -2,9 +2,10 @@ from __future__ import annotations
 from urllib.parse import urljoin
 from copy import deepcopy
 import pandas as pd
-from typing import Optional, Union, List, Dict, Callable
+from typing import (Optional, Union, List, Dict, Callable, Sequence)
 from collections import deque
-import os
+# import os
+import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 from argparse import ArgumentParser
@@ -30,13 +31,15 @@ DEFAULT_START_DATE = dt.date(2020, 1, 1)
 config_p = Path(DEFAULT_CONFIG)
 if not config_p.exists():
     config_p.parent.mkdir(parents=True, exist_ok=True)
-    config_p.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=input("the config file wasn't found - enter your apikey: ")))
+    config_p.write_text(r"""{{"apikey": "{a}"}}""".format(
+    a=input("the config file wasn't found - enter your apikey: "))
+    )
 
 class Ticker(AbstractAPI):
 
     def __init__(self, ticker: Optional[Union[str, List[str]]]=None, 
-        config: Union[str, Config]=DEFAULT_CONFIG, 
-        mode='statements',
+        config: Union[str, Callable, Config]=DEFAULT_CONFIG, 
+        mode: str='statements',
         ignore_unavailable_tickers: bool=False,
         **kwargs):
         super(Ticker, self).__init__(config=config,
@@ -64,7 +67,7 @@ class Ticker(AbstractAPI):
         elif ticker is None: # special instantiation without ticker only allowed for using the all_company_profiles class method
             self.classmethod_mode = True
             self.tickers = ""
-            print("Ticker unspecified. Only get_all_company_profiles method will work in this mode")
+            warnings.warn("Ticker unspecified. Only get_all_company_profiles method will work in this mode")
         else:
             raise TypeError("ticker must be a string or a list of strings")
         self.tickers_str = ",".join(self.tickers)
@@ -114,7 +117,8 @@ class Ticker(AbstractAPI):
         else:
             raise TypeError("value returned from API is not a list")
 
-    def income_statements(self, freq: int="A", 
+    def income_statements(self, 
+        freq: int="A", 
         save_to_sql: bool=False, 
         limit: int=100) -> Optional[pd.DataFrame]:
         """get income statement
@@ -124,13 +128,19 @@ class Ticker(AbstractAPI):
             freq=freq, save_to_sql=save_to_sql, limit=limit)
 
     @classmethod
-    def get_income_statements(cls, tickers, config, 
+    def get_income_statements(cls, 
+        tickers: Union[str, Sequence[str]], 
+        config: Union[str, Callable, Config]=DEFAULT_CONFIG, 
         freq: int='A',
         limit: int=100):
-        """classmethod version of income_statement. Doesn't allow save_to_sql"""
-        return cls(tickers=tickers, config=config).income_statements(freq=freq, limit=limit)
+        """classmethod version of `income_statement`. 
+        Doesn't allow save_to_sql"""
+        return cls(tickers=tickers, config=config)\
+            .income_statements(freq=freq, limit=limit)
 
-    def get_balance_sheet(self, freq="A", save_to_sql: bool=False, 
+    def balance_sheet(self, 
+        freq: str="A", 
+        save_to_sql: bool=False, 
         limit: int=100) -> Optional[pd.DataFrame]:
         """get balance sheet statement
         :param freq: takes 'A' or 'Q'
@@ -138,13 +148,37 @@ class Ticker(AbstractAPI):
         return self.__get_statements(statement='balance_sheet', 
             freq=freq, save_to_sql=save_to_sql, limit=limit)
 
-    def get_cashflow(self, freq="A", save_to_sql: bool=False,
+    @classmethod
+    def get_balance_sheet(cls,
+        tickers: Union[str, Sequence[str]],
+        config: Union[str, Callable, Config]=DEFAULT_CONFIG,
+        freq="A", 
+        limit: int=100
+        ):
+        """classmethod version of `balance_sheet`"""
+        return cls(tickers=tickers, config=config)\
+            .income_statements(freq=freq, limit=limit)
+
+    def cashflow(self, 
+        freq="A", 
+        save_to_sql: bool=False,
         limit: int=100) -> Optional[pd.DataFrame]:
         """get cash flow statement
         :param freq: takes 'A' or 'Q'
         """
         return self.__get_statements(statement='cashflow', 
             freq=freq, save_to_sql=save_to_sql, limit=limit)
+    
+    @classmethod
+    def get_cashflow(cls,
+        tickers: Union[str, Sequence[str]],
+        config: Union[str, Callable, Config]=DEFAULT_CONFIG,
+        freq="A", 
+        limit: int=100
+        ):
+        """classmethod version of `cashflow`"""
+        return cls(tickers=tickers, config=config)\
+            .cashflow(freq=freq, limit=limit)
     
     def product_segments(self, freq='A') -> Union[Dict, List]:
         """get the product segments for the ticker

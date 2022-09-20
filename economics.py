@@ -43,7 +43,7 @@ DEFAULT_SQL_PATH = './FinancialModelingPrep/data/economics.db'
 config_p = Path(DEFAULT_CONFIG)
 if not config_p.exists():
     config_p.parent.mkdir(parents=True, exist_ok=True)
-    config_p.write_text(r"""\"\{"apikey": "{a}"\}\"""".format(a=input("the config file wasn't found - enter your apikey: ")))
+    config_p.write_text(r"""{{"apikey": "{a}"}}""".format(a=input("the config file wasn't found - enter your apikey: ")))
 
 sql_p = Path(DEFAULT_SQL_PATH)
 if not sql_p.exists():

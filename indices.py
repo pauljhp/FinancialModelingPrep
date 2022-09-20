@@ -24,6 +24,14 @@ NOW = dt.datetime.now()
 CUR_YEAR = TODAY.year
 LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
 
+config_p = Path(DEFAULT_CONFIG)
+if not config_p.exists():
+    config_p.parent.mkdir(parents=True, exist_ok=True)
+    config_p.write_text(r"""{{"apikey": "{a}"}}""".format(
+    a=input("the config file wasn't found - enter your apikey: "))
+    )
+
+
 class Index(AbstractAPI):
 
     def __init__(self, 
