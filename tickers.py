@@ -62,7 +62,7 @@ class Ticker(AbstractAPI):
             if not ignore_unavailable_tickers:
                 assert len(ticker) == sum([str(t).upper().strip() in self.available_tickers 
                         for t in ticker]), \
-                        f"All tickers must be available! These are not valid tickers: {' '.join([t for t in tickers if t not in self.available_tickers])}"
+                        f"All tickers must be available! These are not valid tickers: {' '.join([t for t in ticker if t not in self.available_tickers])}"
             self.tickers = [str(t).upper() for t in ticker]
         elif ticker is None: # special instantiation without ticker only allowed for using the all_company_profiles class method
             self.classmethod_mode = True
@@ -467,7 +467,7 @@ class Ticker(AbstractAPI):
     
     @classmethod
     def get_list_execs(cls, ticker: Union[str, List[str]]):
-        """classmethod version of get_execs"""
+        """classmethod version of `get_execs`"""
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).list_execs()
 
@@ -566,7 +566,7 @@ class Ticker(AbstractAPI):
     def get_current_price(cls, ticker: Union[str, List[str]]):
         """classmethod version of current_price"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).get_current_price()
+            config=DEFAULT_CONFIG).current_price()
     
     def historical_price(self, start_date: Union[str, dt.date],
         end_date: Union[str, dt.date], freq='d'):
