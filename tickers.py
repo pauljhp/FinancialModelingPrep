@@ -556,7 +556,7 @@ class Ticker(AbstractAPI):
     
     def current_price(self):
         """get current quote price"""
-        url = urljoin("quote", self.tickers_str)
+        url = urljoin("quote/", self.tickers_str)
         res = self._get_data(url)
         if isinstance(res, list):
             df = pd.concat([pd.Series(d).to_frame().T for d in res])
