@@ -48,6 +48,7 @@ if not config_p.exists():
 sql_p = Path(DEFAULT_SQL_PATH)
 if not sql_p.exists():
     print("creating sql file")
+    sql_p.partent.mkdir(parents=True, exist_ok=True)
     sql_p.touch()
 
 class Economics(AbstractAPI):
