@@ -4,12 +4,12 @@ from copy import deepcopy
 import pandas as pd
 from typing import (Optional, Union, List, Dict, Callable, Sequence)
 from collections import deque
-# import os
 import warnings
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 from argparse import ArgumentParser
 from pathlib import Path
+import math
 from ._abstract import AbstractAPI
 from .utils.config import Config
 from .utils.utils import pandas_strptime, iter_by_chunk
@@ -568,36 +568,66 @@ class Ticker(AbstractAPI):
         return cls(ticker=ticker, 
             config=DEFAULT_CONFIG).current_price()
     
-    def historical_price(self, start_date: Union[str, dt.date],
-        end_date: Union[str, dt.date], freq='d'):
-        """get the historical price of the tickers
-        :param start_date: either "%Y-%m_d" or dt.date format
-        :param end_date: either "%Y-%m_d" or dt.date format
+    def _historical_price(self,
+        start_date: Union[str, dt.date],
+        end_date: Union[str, dt.date], 
+        ticker: Optional[str]=None,
+        freq='d'):
+        """get the historical price of the tickers. 
+        number of tickers need be be <= 5
+        :param start_date: either "%Y-%m-%d" or dt.date format
+        :param end_date: either "%Y-%m-%d" or dt.date format
+        :param ticker: optional, if specicified, will overwrite self.ticker
         :param freq: takes 'd', '1hour', '30min', '15min', '5min', '1min'
         """
         if isinstance(start_date, dt.date): start_date = start_date.strftime("%Y-%m-%d")
         if isinstance(end_date, dt.date): end_date = end_date.strftime("%Y-%m-%d")
-        assert isinstance(start_date, str) and isinstance(end_date, str), "only str and dt.date accepted for start_date and end_date"
+        assert isinstance(start_date, str) and isinstance(end_date, str), f"only str and dt.date accepted for start_date and end_date, you entered {type(start_date)} and {type(end_date)}"
+        ticker = ticker if ticker else self.tickers_str
         if freq == 'd':
-            url = urljoin(f"historical-price-full/", self.tickers_str)
+            url = urljoin(f"historical-price-full/", ticker)
             res = self._get_data(url, 
             additional_params={'from': start_date, 
                 "to": end_date})
-            if isinstance(res, dict):
-                tickers = res.get('symbol')
-                df = pd.concat([pd.Series(d).to_frame().T 
-                    for d in res.get('historical')])
-                df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
-                return df
+            if len(self.tickers) <= 1: # single ticker mode
+                if isinstance(res, dict):
+                    # tickers = res.get('symbol')
+                    if "historical" in res.keys():
+                        df = pd.concat([pd.Series(d).to_frame().T for d 
+                            in res.get('historical') if len(d) > 0])
+                        df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
+                        return df
+                else: return res
             else:
+                if isinstance(res, dict):
+                    if "historicalStockList" in res.keys():
+                        res = res.get("historicalStockList")
+                        ls = []
+                        for r in res:
+                            if "historical" in r.keys():
+                                symbol = r.get("symbol")
+                                df = pd.concat([pd.Series(d).to_frame().T for d 
+                                    in r.get('historical') if len(d) > 0])
+                                df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
+                                df.columns = pd.MultiIndex.from_tuples([(symbol, c) for c in df.columns])
+                                ls.append(df.T)
+                        res = pd.concat(ls).T
+                    elif "historical" in res.keys():
+                        res = pd.concat([pd.Series(d).to_frame().T for d 
+                                    in res.get('historical') if len(d) > 0])
+                        symbol = res.get("symbol")
+                        res = res.set_index("date")
+                        res.columns = pd.MultiIndex.from_tuples([(symbol, c) for c in res.columns])
                 return res
+
+            
         elif freq in ['1hour', '30min', '15min', '5min', '1min']:
-            url = urljoin(f"historical-chart/{freq}/", self.tickers_str)
+            url = urljoin(f"historical-chart/{freq}/", ticker)
             res = self._get_data(url, 
             additional_params={'from': start_date, 
                 "to": end_date})
             if isinstance(res, dict):
-                tickers = res.get('symbol')
+                # tickers = res.get('symbol')
                 df = pd.concat([pd.Series(d).to_frame().T 
                     for d in res.get('historical')])
                 df = df.set_index('date') # FIXME - this will not work with multiple ticker queries
@@ -606,14 +636,43 @@ class Ticker(AbstractAPI):
         else:
             raise NotImplementedError
 
+    def historical_price(self, 
+        start_date: Union[str, dt.date],
+        end_date: Union[str, dt.date], 
+        freq='d',
+        max_workers: int=8) -> pd.DataFrame:
+        """extension of _historical_price to allow > 5 tickers"""
+        res = []
+        if len(self.tickers) >= 5:
+            batch_size = 5 * max_workers
+            for batch in iter_by_chunk(self.tickers, batch_size):
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    futures = [executor.submit(
+                        self._historical_price, start_date=start_date, 
+                        end_date=end_date, ticker=",".join(chunk), freq=freq)
+                        for chunk in iter_by_chunk(batch, 5)] # FIXME - change to classmethod
+                    for future in as_completed(futures):
+                        res.append(future.result())
+            res = pd.concat([d.T for d in res]).T
+        else:
+            res = self._historical_price(start_date, end_date, self.tickers_str, freq)
+        return res
+                
+
     @classmethod
     def get_historical_price(cls, ticker: Union[str, List[str]],
         start_date: Union[str, dt.date],
-        end_date: Union[str, dt.date], freq='d'):
+        end_date: Union[str, dt.date], 
+        freq='d',
+        **kwargs):
         """classmethod version of historical_price"""
         return cls(ticker=ticker, 
-            config=DEFAULT_CONFIG).historical_price(start_date=start_date, 
-                end_date=end_date, freq=freq)
+            config=DEFAULT_CONFIG,
+            **kwargs)\
+                .historical_price(
+                    start_date=start_date, 
+                    end_date=end_date, 
+                    freq=freq)
 
     def stock_news(self, limit: Optional[int]=None, 
         start_date: Union[dt.date, str]=DEFAULT_START_DATE):
