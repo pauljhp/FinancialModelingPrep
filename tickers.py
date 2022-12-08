@@ -613,9 +613,9 @@ class Ticker(AbstractAPI):
                                 ls.append(df.T)
                         res = pd.concat(ls).T
                     elif "historical" in res.keys():
+                        symbol = res.get("symbol")
                         res = pd.concat([pd.Series(d).to_frame().T for d 
                                     in res.get('historical') if len(d) > 0])
-                        symbol = res.get("symbol")
                         res = res.set_index("date")
                         res.columns = pd.MultiIndex.from_tuples([(symbol, c) for c in res.columns])
                 return res
