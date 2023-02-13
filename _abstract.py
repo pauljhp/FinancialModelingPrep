@@ -54,7 +54,9 @@ class AbstractAPI(ABC):
         assert isinstance(config, Config)
         return config
 
-    def _get_available_tickers(self, mode='statements'
+    def _get_available_tickers(
+        self, 
+        mode='statements'
         ) -> Union[List, pd.DataFrame]:
         """
         Get the list of all available tickers.
@@ -102,7 +104,8 @@ class AbstractAPI(ABC):
         self.sql_conn = sqlite3.connect(sql_path) if sql_path else None
         self._cur = self.sql_conn.cursor() if self.sql_conn else None
     
-    def _get_data(self, url: str, ticker: Optional[str]=None, 
+    def _get_data(self, url: str, 
+        ticker: Optional[str]=None, 
         additional_params: Optional[Dict]=None,
         ignore_error: bool=True, 
         **kwargs, ) -> Union[List, Dict]:
