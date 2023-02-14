@@ -28,6 +28,9 @@ NOW = dt.datetime.now()
 CUR_YEAR = TODAY.year
 LAST_Q = (TODAY - dt.timedelta(days=90)).month // 3
 DEFAULT_START_DATE = dt.date(2020, 1, 1)
+MAX_INPUT_LEN = 5
+
+
 
 config_p = Path(DEFAULT_CONFIG)
 if not config_p.exists():
@@ -62,6 +65,7 @@ class ForEx(AbstractAPI):
         res = self._get_data(url="quotes/forex")
         if isinstance(res, List):
             df = pd.concat([pd.Series(d).to_frame().T for d in res]).T
+            df = df.T.set_index("symbol").T
             return df
         else: return res
 
@@ -70,16 +74,18 @@ class ForEx(AbstractAPI):
         config: Union[str, Callable, Config]=DEFAULT_CONFIG) -> Union[Dict, pd.DataFrame]:
         return cls(config=config)._get_live_fx()
 
-    def _get_historical_fx(self,
+    def __get_historical_fx(self,
         ticker: Union[str, Sequence[str]],
         freq: str="d") -> pd.DataFrame:
-        """get the historical fx rate
+        """base method to get the historical fx rate
         :param ticker: takes list or str. must be in the `self.available_tickers_ ` list
         :param freq: takes the following arguments:
             - "d", "daily", "day" - daily frequency
             - "Xmin" for X in [1, 5, 15, 30]
             - "Xhour" for X in [1, 4]
         """
+        if isinstance(ticker, Sequence):
+            assert len(ticker) <= 5, "FMP does not accept sequences longer than 5 tickers!"
         chart_freqs = [f"{i}min" for i in (1, 5, 15, 30)] + \
             [f"{i}hour" for i in (1, 4)]
         if isinstance(ticker, str):
@@ -132,10 +138,47 @@ class ForEx(AbstractAPI):
         else:
             raise ValueError("frequency specified not supported!")
 
+    def _get_historical_fx(self,
+        ticker: Union[str, Sequence[str]],
+        max_workers: int=8,
+        freq: str="d"):
+        """get the historical fx rate
+        :param ticker: takes list or str. must be in the `self.available_tickers_ ` list
+        :max_workers: number of workers for multithreaded process
+        :param freq: takes the following arguments:
+            - "d", "daily", "day" - daily frequency
+            - "Xmin" for X in [1, 5, 15, 30]
+            - "Xhour" for X in [1, 4]
+        """
+        if isinstance(ticker, str):
+            return self.__get_historical_fx(ticker, freq)
+        elif isinstance(ticker, Sequence):
+            if len(ticker) <= MAX_INPUT_LEN:
+                return self.__get_historical_fx(ticker, freq)
+            else:
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    max_len = max_workers * MAX_INPUT_LEN
+                    ls = []
+                    if len(ticker) <= max_len:
+                        futures = [executor.submit(self.__get_historical_fx, c, freq) for c in iter_by_chunk(ticker, MAX_INPUT_LEN)]
+                        for future in as_completed(futures):
+                            ls.append(future.result())
+                    else:
+                        for chunk in iter_by_chunk(ticker, max_len):
+                            futures = [executor.submit(self.__get_historical_fx, c, freq) for c in iter_by_chunk(chunk, MAX_INPUT_LEN)]
+                            for future in as_completed(futures):
+                                ls.append(future.result())
+                    res = pd.concat(ls)
+                    return res
+                        
+        else:
+            raise TypeError("only sequence of strings or str accepted for `ticker`")
+
     @classmethod
     def get_historical_fx(cls, 
         ticker: Union[str, Sequence[str]],
+        max_worker: int=8,
         config: Union[str, Callable, Config]=DEFAULT_CONFIG,
         freq: str="d"):
-        return cls(config=config)._get_historical_fx(ticker, freq)
+        return cls(config=config)._get_historical_fx(ticker, max_worker, freq)
     

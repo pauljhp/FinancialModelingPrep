@@ -37,7 +37,8 @@ if not config_p.exists():
 
 class Ticker(AbstractAPI):
 
-    def __init__(self, ticker: Optional[Union[str, List[str]]]=None, 
+    def __init__(self, 
+        ticker: Optional[Union[str, List[str]]]=None, 
         config: Union[str, Callable, Config]=DEFAULT_CONFIG, 
         mode: str='statements',
         ignore_unavailable_tickers: bool=False,
